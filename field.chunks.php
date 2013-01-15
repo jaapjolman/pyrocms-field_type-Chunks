@@ -37,7 +37,55 @@ class Field_chunks
 	 */
 	public function pre_save($input, $field, $stream, $id)
 	{
-		var_dump($input); exit();
+		$table_name		= $stream->stream_prefix.$stream->stream_slug.'_chunks';
+		
+		$chunk_slug		= $this->CI->input->post('chunk_slug');
+		$chunk_class	= $this->CI->input->post('chunk_class');
+		$chunk_type		= $this->CI->input->post('chunk_type');
+		$chunk_body		= $this->CI->input->post('chunk_body');
+		
+		$i = 0;
+		$chunks = array();
+		foreach ($chunk_slug as $key => $chunk)
+		{
+			$chunks[$key]['sort']	= ++$i;
+			$chunks[$key]['slug']	= $chunk;
+			$chunks[$key]['class']	= $chunk_class[$key];
+			$chunks[$key]['type']	= $chunk_type[$key];
+			$chunks[$key]['container_id']	= $id;
+			
+			if ($key == $stream->title_column)
+			{
+				// allow field/form validation
+				$chunks[$key]['body'] = $this->CI->input->post($stream->title_column);
+			}
+			else
+			{
+				$chunks[$key]['body'] = $chunk_body[$key];	
+			}
+			
+			// have to parse content
+			$chunks[$key]['parsed'] = ($chunks[$key]['type'] == 'markdown') ? parse_markdown($chunks[$key]['body']) : '';
+		}
+
+/*
+		if (is_numeric($row_id = $this->CI->input->post('row_edit_id')))
+		{
+			$this->CI->db->where('row_id', $this->CI->input->post('row_edit_id'))->delete($table_name);
+		}
+		else
+		{
+			$row_id = $id;
+		}
+*/
+
+		// transaction
+		foreach ($chunks as $chunk)
+		{
+			$this->CI->db->insert($table_name, $chunk);
+			// rollback
+		}
+		// endtransaction
 	}
 
 	// --------------------------------------------------------------------------
@@ -209,27 +257,35 @@ class Field_chunks
 	 */
 	public function form_output($data, $entry_id, $field)
 	{
-		$options['class']	= 'wysiwyg-advanced';
+		$chunk['type']	= 'wysiwyg-advanced';
 	
-		$options['name'] 	= $data['form_slug'];
-		$options['id']		= $data['form_slug'];
-		$options['value']	= $data['value'];
+		$chunk['slug'] 	= $data['form_slug'];
+		$chunk['id']	= $data['form_slug'];
+		$chunk['body']	= $data['value'];
+		$chunk['class']	= '';
 		
-		//array('id' => $chunk['slug'].'_'.$chunk['id'],'name'=>'chunk_body['.$chunk['id'].']', 'value' => $chunk['body'], 'rows' => 20, 'class'=> $chunk['type'], 'style' => 'width:100%');
+		$options = array(
+			'id'	=> $chunk['slug'].'_'.$chunk['id'],
+			'name'	=> $chunk['id'],
+			'value'	=> $chunk['body'],
+			'rows'	=> 20,
+			'class'	=> $chunk['type'],
+			'style'	=> 'width:100%'
+		);
 		
-		var_dump($data); var_dump($entry_id); var_dump($field); exit();
+		//var_dump($data); var_dump($entry_id); var_dump($field); exit();
 		
-		$html = "<ul id='chunks'>".
+		$html = "<ul id='chunks'>";
 		
 		$html .= "<li class='chunk'>
-					".form_input('default', 'default', 'class="label" placeholder="id"')."
-					".form_input('', '', 'class="label" placeholder="class"')."
-					".form_dropdown('', array(
+					".form_input('chunk_slug['.$chunk['id'].']', $chunk['slug'], 'class="label" placeholder="id"')."
+					".form_input('chunk_class['.$chunk['id'].']', $chunk['class'], 'class="label" placeholder="class"')."
+					".form_dropdown('chunk_type['.$chunk['id'].']', array(
 						'html' => 'html',
 						'markdown' => 'markdown',
 						'wysiwyg-simple' => 'wysiwyg-simple',
 						'wysiwyg-advanced' => 'wysiwyg-advanced',
-					), $options['class']) ."
+					), $chunk['type']) ."
 					<div class='alignright'>
 						<a href='javascript:void(0)' class='remove-chunk btn red'>".lang('global:remove')."</a>
 						<span class='sort-handle'></span>
@@ -240,10 +296,10 @@ class Field_chunks
 					</span>
 				</li>";
 				
-		$html .= "</ul><a class='add-chunk btn orange' href='#'>".lang('pages:add_page_chunk')."</a>";
+		$html .= "</ul><a class='add-chunk btn orange' href='#'>".lang('streams.add_chunk')."</a>";
 			
 		return $html;
 	}
 }
 
-/* End of file field.multiple.php */
+/* End of file field.chunks.php */
